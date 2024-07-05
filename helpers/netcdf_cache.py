@@ -26,7 +26,7 @@ class netcdf_property:
         funcname = self.function.__name__
         #filename = os.path.join(instance.folder, funcname+'_'+instance.key+'.nc')
         #filename = os.path.join('/scratch/pp2681/mom6/cache', funcname+'_'+instance.key+'.nc')
-        filename = os.path.join('~/cache', '-'.join(instance.folder.split('/')[4:-2])+'-'+instance.key+'-'+funcname+'.nc')
+        filename = os.path.join('/home/ctrsp-2024/pp2681/cache', '-'.join(instance.folder.split('/')[4:-2])+'-'+instance.key+'-'+funcname+'.nc')
         #print(filename)
         if instance.recompute:
             try:
@@ -52,6 +52,9 @@ class netcdf_property:
                     os.remove(filename) # value will be recalculated below
             else:
                 os.remove(filename) # value will be recalculated below
+        else:
+            #print(f'{filename} does not exist')
+            pass
 
         #print(f'Calculating value of {funcname}')
         try:
