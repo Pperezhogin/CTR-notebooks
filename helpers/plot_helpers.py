@@ -169,7 +169,7 @@ def default_rcParams(kw={}):
             rcParams[key] = val
 
     matplotlib.rcParams.update({
-        'font.family': 'MathJax_Main',
+        #'font.family': 'DejaVuSans_Condensed',
         'mathtext.fontset': 'cm',
 
         'figure.figsize': (4, 4),

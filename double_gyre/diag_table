@@ -16,6 +16,7 @@
 #=========================
 
 "ocean_model","smag_const", "smag_const","series_%4yr_%3dy","all",.false.,"none",2
+"ocean_model","CR_const", "CR_const","series_%4yr_%3dy","all",.false.,"none",2
 
 #"ocean_model","PG23_u"        ,"u"        ,"pg23_%4yr_%3dy","all",.false.,"none",2
 #"ocean_model","PG23_v"        ,"v"        ,"pg23_%4yr_%3dy","all",.false.,"none",2

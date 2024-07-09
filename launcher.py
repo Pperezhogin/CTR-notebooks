@@ -207,17 +207,40 @@ JansenHeld = dictionary(
 
 #########################################################################################
 if __name__ == '__main__':
-    for conf in ['R3', 'R4', 'R5', 'R6', 'R7', 'R8']:
+    # for conf in ['R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8']:
+    #     for reduce in [0,1]:
+    #         for ssm in ['False', 'True']:
+    #             for zelong in ['False', 'True']:
+    #                 parameters = PARAMETERS.add(
+    #                     SMAG_BI_CONST=1.0,
+    #                     USE_PG23='True',
+    #                     PG23_REDUCE=reduce,
+    #                     PG23_SSM=ssm,
+    #                     PG23_ZELONG_DYNAMIC=zelong
+    #                     ).add(**configuration(conf))
+    #                 ntasks = dict(R2=4, R3=8, R4=16, R5=16, R6=16, R7=32, R8=32)[conf]
+    #                 hpc = HPC.add(ntasks=ntasks, time=24)
+    #                 run_experiment(f'/home/ctrsp-2024/pp2681/experiments/generalization/zelong-{zelong}-ssm-{ssm}-reduce-{reduce}/{conf}', hpc, parameters)
+
+    # for conf in ['R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8']:
+    #     for Cs in [0.01, 0.03]:
+    #         parameters = PARAMETERS.add(
+    #             SMAG_BI_CONST=Cs,
+    #             ).add(**configuration(conf))
+    #         ntasks = dict(R2=4, R3=8, R4=16, R5=16, R6=16, R7=32, R8=32)[conf]
+    #         hpc = HPC.add(ntasks=ntasks, time=24)
+    #         run_experiment(f'/home/ctrsp-2024/pp2681/experiments/Feb2022/bare/{conf}-{Cs}', hpc, parameters)
+
+    for conf in ['R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8']:
         for reduce in [0,1]:
-            for ssm in ['False', 'True']:
-                for zelong in ['False', 'True']:
-                    parameters = PARAMETERS.add(
-                        SMAG_BI_CONST=1.0,
-                        USE_PG23='True',
-                        PG23_REDUCE=reduce,
-                        PG23_SSM=ssm,
-                        PG23_ZELONG_DYNAMIC=zelong
-                        ).add(**configuration(conf))
-                    ntasks = dict(R2=4, R3=8, R4=16, R5=16, R6=16, R7=32, R8=32)[conf]
-                    hpc = HPC.add(ntasks=ntasks, time=24)
-                    run_experiment(f'/home/ctrsp-2024/pp2681/experiments/generalization/zelong-{zelong}-ssm-{ssm}-reduce-{reduce}/{conf}', hpc, parameters)
+            parameters = PARAMETERS.add(
+                SMAG_BI_CONST=1.0,
+                USE_PG23='True',
+                PG23_REDUCE=reduce,
+                PG23_SSM='True',
+                PG23_ZELONG_DYNAMIC='True',
+                PG23_REYNOLDS='True'
+                ).add(**configuration(conf))
+            ntasks = dict(R2=4, R3=8, R4=16, R5=16, R6=16, R7=32, R8=32)[conf]
+            hpc = HPC.add(ntasks=ntasks, time=24)
+            run_experiment(f'/home/ctrsp-2024/pp2681/experiments/generalization/zelong-three-component-reduce-{reduce}/{conf}', hpc, parameters)

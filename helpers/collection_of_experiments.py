@@ -323,7 +323,7 @@ class CollectionOfExperiments:
 
         plt.tight_layout()
 
-    def plot_RV(self, exps, labels=None,idx=-1, zl=0, ncols=3, vmax=0.2):
+    def plot_RV(self, exps, labels=None,idx=-1, zl=0, ncols=3, vmax=0.2, fontsize=None):
         if labels is None:
             labels=exps
         nfig = len(exps)
@@ -348,7 +348,7 @@ class CollectionOfExperiments:
             plt.ylim([30,50])
             plt.xlabel('Longitude')
             plt.ylabel('Latitude')
-            plt.title(labels[ifig])
+            plt.title(labels[ifig], fontsize=fontsize)
             plt.gca().set_aspect(1)
         
         plt.colorbar(im, ax=plt.gcf().axes, label='Relative vorticity in \n Coriolis units, $\zeta/f$', extend='both')
