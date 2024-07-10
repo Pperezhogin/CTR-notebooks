@@ -6,6 +6,7 @@ from scipy import signal
 import xarray as xr
 import os
 import gcm_filters
+import xgcm
 
 def grid_spacing(param):
         IdxCv = 1. / param.dxCv.values
@@ -385,27 +386,57 @@ def remesh(input, target, fillna=True):
     
     return result
 
-def gaussian_remesh(_input, target, FGR=2):
+def get_grid(param):
+    return xgcm.Grid(param, coords={
+            'X': {'center': 'xh', 'outer': 'xq'},
+            'Y': {'center': 'yh', 'outer': 'yq'}},
+            boundary={'X': 'fill', 'Y': 'fill'},
+            fill_value = {'X': 0, 'Y': 0})
+
+def gaussian_filter(_input, input_mask, filter_scale=2):
     '''
     input - xr.DataArray() on high-resolution grid
-    target - any xr.DataArray() containing target coordinates;
-    returns filtered and coarsegrained version of input_field
     '''
-    # Define grid ratio
-    ratio = math.ceil(np.diff(x_coord(target))[0] / np.diff(x_coord(_input))[0])
-
-    G = gcm_filters.Filter(filter_scale = ratio * FGR, dx_min=1) 
-    
     # Find spatial coordinates
     x = 'xh' if 'xh' in _input.dims else 'xq'
     y = 'yh' if 'yh' in _input.dims else 'yq'    
+
+    # Chunking for GCM filters which need boundary
+    _input = _input.pad({x:1, y:1}, constant_values=0).chunk({x:-1, y:-1})
+    input_mask = input_mask.pad({x:1,y:1}, constant_values=0).chunk({x:-1, y:-1})
+
+    filter_simple_fixed_factor = gcm_filters.Filter(
+                filter_scale= filter_scale,
+                dx_min=1,
+                filter_shape=gcm_filters.FilterShape.GAUSSIAN,
+                grid_type=gcm_filters.GridType.REGULAR_WITH_LAND,
+                grid_vars={'wet_mask': input_mask}
+                )
+
+    filtered = filter_simple_fixed_factor.apply((_input * input_mask).fillna(0.), dims=(y,x))
+
+    filtered = filtered.isel({x:slice(1,-1), y:slice(1,-1)})
     
-    filtered = G.apply(_input, dims=(y,x))
-    
-    # Coarsegrain
-    coarsegrained = remesh(filtered, target)
-    
-    return coarsegrained
+    return filtered
+
+def interpolate(_input, output_mask):
+    '''
+    input - xr.DataArray() on high-resolution grid
+    '''
+    # Find spatial coordinates
+    x = 'xh' if 'xh' in _input.dims else 'xq'
+    y = 'yh' if 'yh' in _input.dims else 'yq'    
+
+    return _input.fillna(0.).interp({x:output_mask[x], y:output_mask[y]}) * output_mask
+
+def gaussian_remesh(_input, output_mask, input_mask, FGR=np.sqrt(6)):
+    x_input = x_coord(input_mask)
+    x_output = x_coord(output_mask)
+    ratio = math.ceil(np.diff(x_output)[0] / np.diff(x_input)[0])
+
+    return interpolate(
+                gaussian_filter(_input, input_mask, FGR * ratio),
+                output_mask)
 
 def compute_isotropic_KE(u_in, v_in, dx, dy, Lat=(35,45), Lon=(5,15), window='hann', 
         nfactor=2, truncate=True, detrend='linear', window_correction=True, nd_wavenumber=False):

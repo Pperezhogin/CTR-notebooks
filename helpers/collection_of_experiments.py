@@ -48,7 +48,7 @@ class CollectionOfExperiments:
                 self[exp].__getattribute__(key)
             self[exp].recompute = False
 
-    def remesh(self, input, target, exp=None, name=None, compute=False, operator=remesh):
+    def remesh(self, input, target, exp=None, name=None, compute=False, operator=remesh, FGR=None):
         '''
         input  - key of experiment to coarsegrain
         target - key of experiment we want to take coordinates from
@@ -59,7 +59,7 @@ class CollectionOfExperiments:
         if name is None:
             name = input+' coarsegrained to '+target
 
-        result = self[input].remesh(self[target], exp, compute, operator) # call experiment method
+        result = self[input].remesh(self[target], exp, compute, operator, FGR) # call experiment method
 
         print('Experiment '+input+' coarsegrained to '+target+
             ' is created. Its identificator='+exp)

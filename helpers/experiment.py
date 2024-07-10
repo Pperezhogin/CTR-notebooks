@@ -3,8 +3,9 @@ import os
 import numpy as np
 import xrft
 from functools import cached_property
-from helpers.computational_tools import rename_coordinates, remesh, compute_isotropic_KE, compute_isotropic_cospectrum, compute_isotropic_PE, compute_KE_time_spectrum, mass_average, Lk_error, select_LatLon, diffx_uq, diffy_vq, diffx_tv, diffy_tu, prodx_uq, prody_vq, filter_iteration, filter_AD
+from helpers.computational_tools import rename_coordinates, remesh, compute_isotropic_KE, compute_isotropic_cospectrum, compute_isotropic_PE, compute_KE_time_spectrum, mass_average, Lk_error, select_LatLon, diffx_uq, diffy_vq, diffx_tv, diffy_tu, prodx_uq, prody_vq, filter_iteration, filter_AD, get_grid, gaussian_remesh, x_coord, gaussian_filter, interpolate
 from helpers.netcdf_cache import netcdf_property
+import math
 
 class main_property(cached_property):
     '''
@@ -35,7 +36,7 @@ class Experiment:
         if not os.path.exists(os.path.join(self.folder, 'ocean_geometry.nc')):
             print('Error, cannot find files in folder'+self.folder)
 
-    def remesh(self, target, key, compute=False, operator=remesh):
+    def remesh(self, target, key, compute=False, operator=remesh, FGR=None):
         '''
         Returns object "experiment", where "Main variables"
         are coarsegrained according to resolution of the target experiment
@@ -45,13 +46,31 @@ class Experiment:
         # The coarsegrained experiment is no longer attached to the folder
         result = Experiment(folder=self.folder, key=key)
         result.operator = operator
+        result.FGR = FGR
 
         # Coarsegrain "Main variables" explicitly
         for key in Experiment.get_list_of_main_properties():
-            if compute:
-                setattr(result, key, operator(self.__getattribute__(key),target.__getattribute__(key)).compute())
+            if key in ['u', 'ua']:
+                mask = 'wet_u'
+            elif key in ['v', 'va']:
+                mask = 'wet_v'
+            elif key in ['e', 'h', 'ea', 'ha']:
+                mask = 'wet'
             else:
-                setattr(result, key, operator(self.__getattribute__(key),target.__getattribute__(key)))
+                mask = 'wet_c'
+
+            input_field = self.__getattribute__(key)
+            output_mask = target.param_extended[mask]
+
+            if operator == gaussian_remesh:
+                kw = {'FGR': FGR, 'input_mask': self.param_extended[mask]}
+            else:
+                kw = {}
+
+            if compute:
+                setattr(result, key, operator(input_field,output_mask,**kw).compute())
+            else:
+                setattr(result, key, operator(input_field,output_mask,**kw))
 
         result.param = target.param # copy coordinates from target experiment
         result._hires = self # store reference to the original experiment
@@ -200,11 +219,11 @@ class Experiment:
     def RV(self):
         return self.prog.RV
 
-    @main_property
+    @property
     def RV_f(self):
         return self.RV / self.param.f
 
-    @main_property
+    @property
     def PV(self):
         return self.prog.PV
     
@@ -215,6 +234,18 @@ class Experiment:
     @property
     def smagv(self):
         return self.mom.diffv
+
+    ####################### Grid variables ###########################
+    @cached_property
+    def param_extended(self):
+        grid = get_grid(self.param)
+
+        param = self.param
+        param['wet_u']=np.floor(grid.interp(param.wet,'X'))
+        param['wet_v']=np.floor(grid.interp(param.wet,'Y'))
+        param['wet_c']=np.floor(grid.interp(param.wet,['X','Y']))
+
+        return param
 
     ########################  Statistical tools  #########################
     #################  Express through main properties ###################
@@ -469,80 +500,91 @@ class Experiment:
     
     # ------------------ Advection Arakawa(gradKE)-Sadourny(PVxuv) ---------------------- #
     # https://mom6.readthedocs.io/en/dev-gfdl/api/generated/pages/Governing_Equations.html
-    @property
-    def KE_Arakawa(self):
+    def KE_Arakawa(self, u, v):
         '''
         https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L1000-L1003
         '''
-        areaCu = self.param.dxCu * self.param.dyCu
-        areaCv = self.param.dxCv * self.param.dyCv
-        areaT = self.param.dxT * self.param.dyT
-        return 0.5 * (remesh(areaCu*self.u**2, areaT) + remesh(areaCv*self.v**2, areaT)) / areaT
+
+        grid = get_grid(self.param)
+        param = self.param_extended
+        areaCu = param.dxCu * param.dyCu
+        areaCv = param.dxCv * param.dyCv
+        areaT = param.dxT * param.dyT
+
+        KEu = grid.interp(param.wet_u * areaCu * u**2, 'X')
+        KEv = grid.interp(param.wet_v * areaCv * v**2, 'Y')
+
+        return 0.5 * (KEu + KEv) / areaT * param.wet
     
-    @property
-    def gradKE(self):
+    def gradKE(self, u, v):
         '''
         https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L1029-L1034
         '''
-        KE = self.KE_Arakawa
-        IdxCu = 1. / self.param.dxCu
-        IdyCv = 1. / self.param.dyCv
+        grid = get_grid(self.param)
+        param = self.param_extended
+        KE = self.KE_Arakawa(u,v)
+        IdxCu = 1. / param.dxCu
+        IdyCv = 1. / param.dyCv
 
-        KEx = diffx_uq(KE, IdxCu) * IdxCu
-        KEy = diffy_vq(KE, IdyCv) * IdyCv
+        KEx = grid.diff(KE, 'X') * IdxCu * param.wet_u
+        KEy = grid.diff(KE, 'Y') * IdyCv * param.wet_v
         return (KEx, KEy)
     
-    @property
-    def relative_vorticity(self):
+    def relative_vorticity(self, u, v):
         '''
         https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L472
         '''
-        dyCv = self.param.dyCv
-        dxCu = self.param.dxCu
-        IareaBu = 1. / (self.param.dxBu * self.param.dyBu)
+        grid = get_grid(self.param)
+        param = self.param_extended
+
+        dyCv = param.dyCv
+        dxCu = param.dxCu
+        IareaBu = 1. / (param.dxBu * param.dyBu)
         # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L309-L310
-        dvdx = diffx_uq(self.v*dyCv,IareaBu)
-        dudy = diffy_vq(self.u*dxCu,IareaBu)
-        return (dvdx - dudy) * IareaBu
+        dvdx = grid.diff(param.wet_v * v * dyCv,'X')
+        dudy = grid.diff(param.wet_u * u * dxCu,'Y')
+        return (dvdx - dudy) * IareaBu * param.wet_c
     
-    @property
-    def PV_cross_uv(self):
+    def PV_cross_uv(self, u, v, h):
         '''
         https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L669-L671
         https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L788-L790
         fx = + q * vh
         fy = - q * uh
         '''
+        grid = get_grid(self.param)
+        param = self.param_extended
+
         # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L131
         # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_continuity_PPM.F90#L569-L570
-        uh = self.u * remesh(self.h,self.u) * self.param.dyCu
+        uh = u * grid.interp(h,'X') * param.dyCu * param.wet_u
         # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L133
-        vh = self.v * remesh(self.h,self.v) * self.param.dxCv
+        vh = v * grid.interp(h,'Y') * param.dxCv * param.wet_v
         # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L484
-        rel_vort = self.relative_vorticity
+        rel_vort = self.relative_vorticity(u,v)
 
         # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L247
-        Area_h = self.param.dxT * self.param.dyT
+        Area_h = param.dxT * param.dyT
         # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L272-L273
-        Area_q = remesh(Area_h, rel_vort) * 4
+        Area_q = grid.interp(Area_h, ['X', 'Y']) * 4
         # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L323
-        hArea_u = remesh(Area_h*self.h,uh)
+        hArea_u = grid.interp(Area_h*h,'X')
         # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L320
-        hArea_v = remesh(Area_h*self.h,vh)
+        hArea_v = grid.interp(Area_h*h,'Y')
         # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L488
-        hArea_q = 2*remesh(hArea_u,rel_vort) + 2*remesh(hArea_v,rel_vort)
+        hArea_q = 2*grid.interp(hArea_u,'Y') + 2*grid.interp(hArea_v,'X')
         # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L489
         Ih_q = Area_q / hArea_q
         
         # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L490
         q = rel_vort * Ih_q
 
-        IdxCu = 1. / self.param.dxCu
-        IdyCv = 1. / self.param.dyCv
+        IdxCu = 1. / param.dxCu
+        IdyCv = 1. / param.dyCv
         # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L669-L671
-        CAu = + remesh(q * remesh(vh,q),IdxCu) * IdxCu
+        CAu = + grid.interp(q * grid.interp(vh,'X'),'Y') * IdxCu * param.wet_u
         # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/core/MOM_CoriolisAdv.F90#L788-L790
-        CAv = - remesh(q * remesh(uh,q),IdyCv) * IdyCv
+        CAv = - grid.interp(q * grid.interp(uh,'Y'),'X') * IdyCv * param.wet_v
 
         return (CAu, CAv)
     
@@ -556,68 +598,55 @@ class Experiment:
         KEx, KEy = self.gradKE
         return (CAu - KEx, CAv - KEy)
     
-    @property
-    def subgrid_forcing(self):
+    def compute_subfilter_forcing(self):
         '''
-        self - coarsegrained experiment
-        hires - highres experiment from which 
-        it was coarsegrained
+        As compared to functions above, this function
+        computes contribution from voticity advection and
+        KE separately and for fixed gaussian filter
         '''
         if hasattr(self, '_hires'):
-            adv = self.advection
-            hires_advection = self._hires.advection
+            if self.operator is not gaussian_remesh:
+                print('Not implemented error')
 
-            fx = self.operator(hires_advection[0],adv[0]) - adv[0]
-            fy = self.operator(hires_advection[1],adv[1]) - adv[1]
+            x_input = x_coord(self._hires.u)
+            x_output = x_coord(self.u)
+            ratio = math.ceil(np.diff(x_output)[0] / np.diff(x_input)[0])
+            filter_scale = self.FGR * ratio
+            # Note when we use operator, we use FGR. Otherwise is the filter scale
 
-            return (fx,fy)
+            u, v, h = self._hires.u.fillna(0.), self._hires.v.fillna(0.), self._hires.h.fillna(0.)
+            CAu_hires, CAv_hires = self._hires.PV_cross_uv(u,v,h)
+            KEx_hires, KEy_hires = self._hires.gradKE(u,v)
+            advx_hires, advy_hires =  CAu_hires - KEx_hires, CAv_hires - KEy_hires
+
+            # Filtered hires tendencies
+            CAu_hires = gaussian_filter(CAu_hires, self._hires.param_extended.wet_u, filter_scale=filter_scale)
+            CAv_hires = gaussian_filter(CAv_hires, self._hires.param_extended.wet_v, filter_scale=filter_scale)
+            advx_hires = gaussian_filter(advx_hires, self._hires.param_extended.wet_u, filter_scale=filter_scale)
+            advy_hires = gaussian_filter(advy_hires, self._hires.param_extended.wet_v, filter_scale=filter_scale)
+
+            uf = gaussian_filter(u, self._hires.param_extended.wet_u, filter_scale=filter_scale)
+            vf = gaussian_filter(v, self._hires.param_extended.wet_v, filter_scale=filter_scale)
+            hf = gaussian_filter(h, self._hires.param_extended.wet, filter_scale=filter_scale)
+
+            CAu_hiresf, CAv_hiresf = self._hires.PV_cross_uv(uf,vf,hf)
+            KEx_hiresf, KEy_hiresf = self._hires.gradKE(uf,vf)
+            advx_hiresf, advy_hiresf =  CAu_hiresf - KEx_hiresf, CAv_hiresf - KEy_hiresf
+
+            kw_u = {'output_mask': self.param_extended.wet_u}
+            kw_v = {'output_mask': self.param_extended.wet_v}
+            SGS_CAu = interpolate(CAu_hires - CAu_hiresf, **kw_u)
+            SGS_CAv = interpolate(CAv_hires - CAv_hiresf, **kw_v)
+
+            SGSx = interpolate(advx_hires - advx_hiresf, **kw_u)
+            SGSy = interpolate(advy_hires - advy_hiresf, **kw_v)
+
+            return {'SGS_CAu': SGS_CAu, 'SGS_CAv': SGS_CAv, 'SGSx': SGSx, 'SGSy': SGSy}
         else:
             print('Error: subgrid forcing cannot be computed')
             print('because there is no associated hires experiment')
             return
-        
-    @property
-    def subgrid_forcing_PV(self):
-        if hasattr(self, '_hires'):
-            CAu = self.PV_cross_uv[0]
-            hires_CAu = self._hires.PV_cross_uv[0]
 
-            fx = self.operator(hires_CAu,CAu) - CAu
-
-            return fx
-        else:
-            print('Error: subgrid forcing cannot be computed')
-            print('because there is no associated hires experiment')
-            return
-    
-    @property
-    def subgrid_momentum_flux(self):
-        uc = self.u
-        vc = self.v
-        hc = self.h
-        RVc = self.RV
-
-        u = self._hires.u
-        v = self._hires.v
-        h = self._hires.h
-        
-        ub = u
-        vb = v
-
-        S_11 = -remesh(u*u,hc) + remesh(uc*uc,hc)
-        S_22 = -remesh(v*v,hc) + remesh(vc*vc,hc)
-        S_12 = -remesh(remesh(u,h) * remesh(v,h),RVc) + remesh(uc,RVc) * remesh(vc,RVc)
-        return S_11, S_12, S_22
-    
-        
-    @netcdf_property
-    def SGSx(self):
-        return self.subgrid_forcing[0]
-    
-    @netcdf_property
-    def SGSy(self):
-        return self.subgrid_forcing[1]
-    
     # --------------------- ZB offline ---------------------- #
     def dudx(self,u=None):
         if u is None:
