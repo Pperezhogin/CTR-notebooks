@@ -6,7 +6,7 @@ from functools import cached_property
 from helpers.computational_tools import rename_coordinates, remesh, compute_isotropic_KE, compute_isotropic_cospectrum, compute_isotropic_PE, compute_KE_time_spectrum, mass_average, Lk_error, select_LatLon, diffx_uq, diffy_vq, diffx_tv, diffy_tu, prodx_uq, prody_vq, filter_iteration, filter_AD, get_grid, gaussian_remesh, x_coord, gaussian_filter, interpolate
 from helpers.netcdf_cache import netcdf_property
 import math
-from helpers.dynamic_model import dyn_model
+from helpers.dynamic_model import dyn_model, dyn_model_SSD
 
 class main_property(cached_property):
     '''
@@ -934,3 +934,6 @@ class Experiment:
 
     def dynamic_model(self, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.sqrt(2), ssm=False, reynolds=False, clip=False, Lat=(35,45), Lon=(5,15), **kw):
         return dyn_model(self.u, self.v, self.param, tf_width, tf_iter, filters_ratio, ssm, reynolds, clip, Lat, Lon, **kw)
+
+    def dynamic_model_SSD(self, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.sqrt(2), ssm=False, reynolds=False, clip=False, Lat=(35,45), Lon=(5,15), **kw):
+        return dyn_model_SSD(self.u, self.v, self.param, tf_width, tf_iter, filters_ratio, ssm, reynolds, clip, Lat, Lon, **kw)
