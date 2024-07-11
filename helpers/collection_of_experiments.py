@@ -146,13 +146,13 @@ class CollectionOfExperiments:
         return p
     
     def plot_transfer(self, exp, target='R64_R4', callback=True):
-        smag = self[exp].Smagorinsky_transfer
-        ZB = self[exp].ZB_transfer
+        full = self[exp].Smagorinsky_transfer
+        SSM = self[exp].SSM_transfer
         kmax = self[exp].kmax
         if target is not None:
             SGS = self[target].SGS_transfer
 
-        matplotlib.rcParams.update({'font.family': 'MathJax_Main',
+        matplotlib.rcParams.update({
         'mathtext.fontset': 'cm','axes.formatter.limits': (-1,2), 
         'axes.formatter.use_mathtext': True, 'font.size': 16})
         plt.figure(figsize=(15,4))
@@ -160,9 +160,9 @@ class CollectionOfExperiments:
             plt.subplot(1,2,zl+1)
             if target is not None:
                 SGS.isel(zl=zl).plot(label='SGS', color='k', ls='-')
-            ZB.isel(zl=zl).plot(label='ZB', color='tab:orange', ls='--')
-            smag.isel(zl=zl).plot(label='Smag', color='tab:green', ls='-.')
-            (ZB+smag).isel(zl=zl).plot(label='ZB+Smag', color='tab:blue')
+            SSM.isel(zl=zl).plot(label='SSM', color='tab:orange', ls='--')
+            (full-SSM).isel(zl=zl).plot(label='Smag', color='tab:green', ls='-.')
+            (full).isel(zl=zl).plot(label='Full', color='tab:blue')
             plt.legend()
             plt.axhline(y=0,ls='-',color='gray',alpha=0.5)
             ax2 = plt.gca().secondary_xaxis('top', functions=(lambda x: x/kmax, lambda x: x*kmax))

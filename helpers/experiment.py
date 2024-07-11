@@ -6,6 +6,7 @@ from functools import cached_property
 from helpers.computational_tools import rename_coordinates, remesh, compute_isotropic_KE, compute_isotropic_cospectrum, compute_isotropic_PE, compute_KE_time_spectrum, mass_average, Lk_error, select_LatLon, diffx_uq, diffy_vq, diffx_tv, diffy_tu, prodx_uq, prody_vq, filter_iteration, filter_AD, get_grid, gaussian_remesh, x_coord, gaussian_filter, interpolate
 from helpers.netcdf_cache import netcdf_property
 import math
+from helpers.dynamic_model import dyn_model
 
 class main_property(cached_property):
     '''
@@ -164,6 +165,12 @@ class Experiment:
         return result
 
     @cached_property
+    def pg23(self):
+        result = xr.open_mfdataset(os.path.join(self.folder, 'pg23_*.nc'), decode_times=False, parallel=True, chunks={'Time': 5, 'zl': 2})
+        rename_coordinates(result)
+        return result
+
+    @cached_property
     def energy(self):
         result = xr.open_mfdataset(os.path.join(self.folder, 'energy_*.nc'), decode_times=False, parallel=True, chunks={'Time': 5, 'zl': 2})
         rename_coordinates(result)
@@ -307,6 +314,10 @@ class Experiment:
     @netcdf_property
     def Smagorinsky_transfer(self):
         return self.transfer(self.smagu, self.smagv)
+
+    @netcdf_property
+    def SSM_transfer(self):
+        return self.transfer(self.pg23.leo_y, -self.pg23.leo_x)
     
     @netcdf_property
     def ZB_transfer(self):
@@ -920,3 +931,6 @@ class Experiment:
         
 #        nu = -ratio * Ediss / Eback
         return (nu*Bx+Dx, nu*By+Dy)
+
+    def dynamic_model(self, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.sqrt(2), ssm=False, reynolds=False, clip=False, Lat=(35,45), Lon=(5,15), **kw):
+        return dyn_model(self.u, self.v, self.param, tf_width, tf_iter, filters_ratio, ssm, reynolds, clip, Lat, Lon, **kw)
