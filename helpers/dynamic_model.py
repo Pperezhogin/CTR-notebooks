@@ -41,9 +41,9 @@ def compute_vorticity_gradients(vort_xy, static, grid):
     lap_vort_y = static.wet_u/static.dyCu * grid.diff(lap_vort,'Y')
     return vort_x, vort_y, lap_vort, lap_vort_x, lap_vort_y
 
-def dyn_model(_u, _v, static, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.sqrt(2), ssm=False, reynolds=False, clip=False, Lat=(35,45), Lon=(5,15), SGS_CAu=None, SGS_CAv=None):
+def dyn_model(_u, _v, static, h = None, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.sqrt(2), ssm=False, reynolds=False, clip=False, Lat=(35,45), Lon=(5,15), SGS_CAu=None, SGS_CAv=None):
     if tf_iter>1:
-        print('Not Implemented error')
+        print('Not Implemented error in dyn_model')
         return
     
     grid = xgcm.Grid(static, coords={
@@ -59,8 +59,8 @@ def dyn_model(_u, _v, static, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.s
     dx2q = static.dxBu**2 ; dy2q = static.dyBu**2
     grid_sp_q4 = ((2.0*dx2q*dy2q) / (dx2q+dy2q))**2
 
-    u = (_u * static.wet_u).fillna(0.).astype('float64').chunk({'Time': 50})
-    v = (_v * static.wet_v).fillna(0.).astype('float64').chunk({'Time': 50})
+    u = (_u * static.wet_u).fillna(0.).astype('float64')#.chunk({'Time': 50})
+    v = (_v * static.wet_v).fillna(0.).astype('float64')#.chunk({'Time': 50})
 
     # Model in vorticity fluxes
     uf = filter_iteration(u, static.wet_u, 'xq', 'yh', tf_iter, tf_width)
@@ -176,13 +176,19 @@ def dyn_model(_u, _v, static, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.s
         '''
         Statistical averaging < >, in this case plane-averaging over the region
         '''
-        return select_LatLon(x,Lat,Lon).sum(['xh', 'yh'])
+        if h is not None:
+            return select_LatLon(x*h,Lat,Lon).sum(['xh', 'yh'])
+        else:
+            return select_LatLon(x,Lat,Lon).sum(['xh', 'yh'])
 
     if clip:
         Cs = (brackets(np.maximum(lm,0.0)) / brackets(mm))
     else:
         Cs = (brackets(lm) / brackets(mm)); 
-    Cs['Time'] = u.Time
+    try:
+        Cs['Time'] = u.Time
+    except:
+        Cs['time'] = u.time
 
     lb = (grid.interp((leo_x-h_x)*bx,'Y') + grid.interp((leo_y-h_y)*by,'X')) * static.dxT * static.dyT
     mb = (grid.interp(m_x*bx,'Y') + grid.interp(m_y*by,'X')) * static.dxT * static.dyT
@@ -253,9 +259,10 @@ def dyn_model(_u, _v, static, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.s
             'dudt_opt': dudt_opt, 'dvdt_opt': dvdt_opt
            }
 
-def dyn_model_SSD(_u, _v, static, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.sqrt(2), ssm=False, reynolds=False, clip=False, Lat=(35,45), Lon=(5,15), SGS_CAu=None, SGS_CAv=None):
+def dyn_model_SSD(_u, _v, static, h=None, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.sqrt(2), ssm=False, reynolds=False, clip=False, Lat=(35,45), Lon=(5,15), SGS_CAu=None, SGS_CAv=None):
     if tf_iter>1:
-        print('Not Implemented error')
+        print('Not Implemented error in dyn_model')
+        print(tf_iter)
         return
     
     grid = xgcm.Grid(static, coords={
@@ -271,8 +278,8 @@ def dyn_model_SSD(_u, _v, static, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=
     dx2q = static.dxBu**2 ; dy2q = static.dyBu**2
     grid_sp_q4 = ((2.0*dx2q*dy2q) / (dx2q+dy2q))**2
 
-    u = (_u * static.wet_u).fillna(0.).astype('float64').chunk({'Time': 50})
-    v = (_v * static.wet_v).fillna(0.).astype('float64').chunk({'Time': 50})
+    u = (_u * static.wet_u).fillna(0.).astype('float64')#.chunk({'Time': 50})
+    v = (_v * static.wet_v).fillna(0.).astype('float64')#.chunk({'Time': 50})
 
     # Model in vorticity fluxes
     uf = filter_iteration(u, static.wet_u, 'xq', 'yh', tf_iter, tf_width)
@@ -373,13 +380,16 @@ def dyn_model_SSD(_u, _v, static, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=
         '''
         Statistical averaging < >, in this case plane-averaging over the region
         '''
-        return select_LatLon(x,Lat,Lon).sum(['xh', 'yh'])
+        if h is not None:
+            return select_LatLon(x*h,Lat,Lon).sum(['xh', 'yh'])
+        else:
+            return select_LatLon(x,Lat,Lon).sum(['xh', 'yh'])
 
     if clip:
         Cs = (brackets(np.maximum(lm,0.0)) / brackets(mm))
     else:
         Cs = (brackets(lm) / brackets(mm)); 
-    Cs['Time'] = u.Time
+    #Cs['Time'] = u.Time
 
     lb = (grid.interp((leo_x-h_x)*bx,'Y') + grid.interp((leo_y-h_y)*by,'X')) * static.dxT * static.dyT
     mb = (grid.interp(m_x*bx,'Y') + grid.interp(m_y*by,'X')) * static.dxT * static.dyT

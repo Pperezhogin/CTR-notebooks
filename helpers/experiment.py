@@ -414,15 +414,15 @@ class Experiment:
     def KE_joul(self, u, v, h):
         return (0.5 * self.vert_grid.R * (remesh(u**2, h) + remesh(v**2, h)) * h * self.param.dxT * self.param.dyT).sum(dim=('xh','yh'))
 
-    @netcdf_property
+    @property
     def KE_joul_series(self):
         return self.KE_joul(self.u, self.v, self.h)
 
-    @netcdf_property
+    @property
     def MKE_joul(self):
         return self.KE_joul(self.u_mean, self.v_mean, self.h_mean)
     
-    @netcdf_property
+    @property
     def EKE_joul(self):
         return self.KE_joul_series.sel(Time=self.Averaging_time).mean(dim='Time') - self.MKE_joul
     
@@ -933,7 +933,7 @@ class Experiment:
         return (nu*Bx+Dx, nu*By+Dy)
 
     def dynamic_model(self, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.sqrt(2), ssm=False, reynolds=False, clip=False, Lat=(35,45), Lon=(5,15), **kw):
-        return dyn_model(self.u, self.v, self.param, tf_width, tf_iter, filters_ratio, ssm, reynolds, clip, Lat, Lon, **kw)
+        return dyn_model(self.u, self.v, self.param, None, tf_width, tf_iter, filters_ratio, ssm, reynolds, clip, Lat, Lon, **kw)
 
     def dynamic_model_SSD(self, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.sqrt(2), ssm=False, reynolds=False, clip=False, Lat=(35,45), Lon=(5,15), **kw):
-        return dyn_model_SSD(self.u, self.v, self.param, tf_width, tf_iter, filters_ratio, ssm, reynolds, clip, Lat, Lon, **kw)
+        return dyn_model_SSD(self.u, self.v, self.param, None, tf_width, tf_iter, filters_ratio, ssm, reynolds, clip, Lat, Lon, **kw)
