@@ -88,6 +88,8 @@ class CollectionOfExperiments:
             exps_names = folders
 
         exps = [folder.replace("/", "-") for folder in folders] # modify folder to be used as a key for caching files
+        if prefix:
+            exps = [prefix+'-'+exp for exp in exps]
             
         # Construct dictionary of experiments, where keys are given by exps
         experiments_dict = {}

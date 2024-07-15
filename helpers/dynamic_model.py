@@ -2,7 +2,7 @@ import xgcm
 import numpy as np
 from helpers.computational_tools import select_LatLon
 
-def filter_iteration(u, mask=None, x='xq', y='yh', niter=1, filter_width=np.sqrt(6)):
+def filter_iteration(u, mask=None, x='xq', y='yh', niter=1, filter_width=np.sqrt(6), neumann=False):
     weight_side = filter_width**2 / 24.
     weight_center = 1. - 2. * weight_side 
     def weighted_sum(x, axis):
@@ -14,6 +14,9 @@ def filter_iteration(u, mask=None, x='xq', y='yh', niter=1, filter_width=np.sqrt
         uf = uf * mask
     for i in range(niter):
         uf = uf.pad({x:1,y:1}, constant_values=0).rolling({x:3, y:3}, center=True).reduce(weighted_sum).fillna(0.).isel({x:slice(1,-1),y:slice(1,-1)})
+        if neumann:
+            maskf = mask.pad({x:1, y:1}, constant_values=0).rolling({x:3, y:3}, center=True).reduce(weighted_sum).fillna(0.).isel({x:slice(1,-1),y:slice(1,-1)})
+            uf = uf / (maskf + 1e-20)
         if mask is not None:
             uf = uf * mask
     return uf.chunk({y:-1,x:-1})
@@ -41,7 +44,7 @@ def compute_vorticity_gradients(vort_xy, static, grid):
     lap_vort_y = static.wet_u/static.dyCu * grid.diff(lap_vort,'Y')
     return vort_x, vort_y, lap_vort, lap_vort_x, lap_vort_y
 
-def dyn_model(_u, _v, static, h = None, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.sqrt(2), ssm=False, reynolds=False, clip=False, Lat=(35,45), Lon=(5,15), SGS_CAu=None, SGS_CAv=None):
+def dyn_model(_u, _v, static, h = None, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.sqrt(2), ssm=False, reynolds=False, clip=False, Lat=(35,45), Lon=(5,15), SGS_CAu=None, SGS_CAv=None, neumann=False):
     if tf_iter>1:
         print('Not Implemented error in dyn_model')
         return
@@ -63,8 +66,8 @@ def dyn_model(_u, _v, static, h = None, tf_width=np.sqrt(6), tf_iter=1, filters_
     v = (_v * static.wet_v).fillna(0.).astype('float64')#.chunk({'Time': 50})
 
     # Model in vorticity fluxes
-    uf = filter_iteration(u, static.wet_u, 'xq', 'yh', tf_iter, tf_width)
-    vf = filter_iteration(v, static.wet_v, 'xh', 'yq', tf_iter, tf_width)
+    uf = filter_iteration(u, static.wet_u, 'xq', 'yh', tf_iter, tf_width, neumann=neumann)
+    vf = filter_iteration(v, static.wet_v, 'xh', 'yq', tf_iter, tf_width, neumann=neumann)
 
     sh_xx, sh_xy, shear_mag, vort_xy = compute_velocity_gradients(u, v, static, grid)
     sh_xxf, sh_xyf, shear_magf, vort_xyf = compute_velocity_gradients(uf, vf, static, grid)
@@ -75,8 +78,8 @@ def dyn_model(_u, _v, static, h = None, tf_width=np.sqrt(6), tf_iter=1, filters_
     smag_x_base = lap_vort_x * grid.interp(shear_mag * grid_sp_q4,'X')
     smag_y_base = lap_vort_y * grid.interp(shear_mag * grid_sp_q4,'Y')
 
-    smag_x = filter_iteration(smag_x_base, static.wet_v, 'xh', 'yq', tf_iter, tf_width)
-    smag_y = filter_iteration(smag_y_base, static.wet_u, 'xq', 'yh', tf_iter, tf_width)
+    smag_x = filter_iteration(smag_x_base, static.wet_v, 'xh', 'yq', tf_iter, tf_width, neumann=neumann)
+    smag_y = filter_iteration(smag_y_base, static.wet_u, 'xq', 'yh', tf_iter, tf_width, neumann=neumann)
 
     smag_xf = (filters_ratio)**4 * lap_vort_xf * grid.interp(shear_magf * grid_sp_q4,'X')
     smag_yf = (filters_ratio)**4 * lap_vort_yf * grid.interp(shear_magf * grid_sp_q4,'Y')
@@ -84,32 +87,32 @@ def dyn_model(_u, _v, static, h = None, tf_width=np.sqrt(6), tf_iter=1, filters_
     m_x = smag_xf - smag_x
     m_y = smag_yf - smag_y
 
-    leo_x = filter_iteration(grid.interp(u,['X','Y']) * grid.interp(vort_xy,'X'), static.wet_v, 'xh', 'yq', tf_iter, tf_width) - \
+    leo_x = filter_iteration(grid.interp(u,['X','Y']) * grid.interp(vort_xy,'X'), static.wet_v, 'xh', 'yq', tf_iter, tf_width, neumann=neumann) - \
             grid.interp(uf,['X','Y']) * grid.interp(vort_xyf,'X')
     leo_x = leo_x * static.wet_v
     
-    leo_y = filter_iteration(grid.interp(v,['X','Y']) * grid.interp(vort_xy,'Y'), static.wet_u, 'xq','yh', tf_iter, tf_width) - \
+    leo_y = filter_iteration(grid.interp(v,['X','Y']) * grid.interp(vort_xy,'Y'), static.wet_u, 'xq','yh', tf_iter, tf_width, neumann=neumann) - \
             grid.interp(vf,['X','Y']) * grid.interp(vort_xyf,'Y')
     leo_y = leo_y * static.wet_u
 
     if ssm:
-        h_x_comb = filter_iteration(grid.interp(uf,['X','Y']) * grid.interp(vort_xyf,'X'), static.wet_v, 'xh', 'yq', 2, tf_width) - \
+        h_x_comb = filter_iteration(grid.interp(uf,['X','Y']) * grid.interp(vort_xyf,'X'), static.wet_v, 'xh', 'yq', 2, tf_width, neumann=neumann) - \
                 grid.interp(
-                    filter_iteration(uf, static.wet_u, 'xq', 'yh', 2, tf_width),
+                    filter_iteration(uf, static.wet_u, 'xq', 'yh', 2, tf_width, neumann=neumann),
                     ['X','Y']) * \
                 grid.interp(
-                    filter_iteration(vort_xyf, static.wet_c, 'xq', 'yq', 2, tf_width),
+                    filter_iteration(vort_xyf, static.wet_c, 'xq', 'yq', 2, tf_width, neumann=neumann),
                             'X')
     
-        h_y_comb = filter_iteration(grid.interp(vf,['X','Y']) * grid.interp(vort_xyf,'Y'), static.wet_u, 'xq', 'yh', 2, tf_width) - \
+        h_y_comb = filter_iteration(grid.interp(vf,['X','Y']) * grid.interp(vort_xyf,'Y'), static.wet_u, 'xq', 'yh', 2, tf_width, neumann=neumann) - \
                 grid.interp(
-                    filter_iteration(vf, static.wet_v, 'xh', 'yq', 2, tf_width),
+                    filter_iteration(vf, static.wet_v, 'xh', 'yq', 2, tf_width, neumann=neumann),
                     ['X','Y']) * \
                 grid.interp(
-                    filter_iteration(vort_xyf, static.wet_c, 'xq', 'yq', 2, tf_width),
+                    filter_iteration(vort_xyf, static.wet_c, 'xq', 'yq', 2, tf_width, neumann=neumann),
                             'Y')
-        h_x_basef = filter_iteration(leo_x, static.wet_v, 'xh', 'yq', 1, tf_width)
-        h_y_basef = filter_iteration(leo_y, static.wet_u, 'xq', 'yh', 1, tf_width)
+        h_x_basef = filter_iteration(leo_x, static.wet_v, 'xh', 'yq', 1, tf_width, neumann=neumann)
+        h_y_basef = filter_iteration(leo_y, static.wet_u, 'xq', 'yh', 1, tf_width, neumann=neumann)
         h_x = h_x_comb - h_x_basef
         h_y = h_y_comb - h_y_basef
     else:
@@ -125,44 +128,44 @@ def dyn_model(_u, _v, static, h = None, tf_width=np.sqrt(6), tf_iter=1, filters_
         vr = v - vf
         vort_xyr = vort_xy - vort_xyf
         
-        bx_base = filter_iteration(grid.interp(ur,['X','Y']) * grid.interp(vort_xyr,'X'), static.wet_v, 'xh', 'yq', 1, tf_width) - \
+        bx_base = filter_iteration(grid.interp(ur,['X','Y']) * grid.interp(vort_xyr,'X'), static.wet_v, 'xh', 'yq', 1, tf_width, neumann=neumann) - \
                 grid.interp(
-                    filter_iteration(ur, static.wet_u, 'xq', 'yh', 1, tf_width),
+                    filter_iteration(ur, static.wet_u, 'xq', 'yh', 1, tf_width, neumann=neumann),
                     ['X','Y']) * \
                 grid.interp(
-                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 1, tf_width),
+                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 1, tf_width, neumann=neumann),
                             'X')
 
-        by_base = filter_iteration(grid.interp(vr,['X','Y']) * grid.interp(vort_xyr,'Y'), static.wet_u, 'xq', 'yh', 1, tf_width) - \
+        by_base = filter_iteration(grid.interp(vr,['X','Y']) * grid.interp(vort_xyr,'Y'), static.wet_u, 'xq', 'yh', 1, tf_width, neumann=neumann) - \
                 grid.interp(
-                    filter_iteration(vr, static.wet_v, 'xh', 'yq', 1, tf_width),
+                    filter_iteration(vr, static.wet_v, 'xh', 'yq', 1, tf_width, neumann=neumann),
                     ['X','Y']) * \
                 grid.interp(
-                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 1, tf_width),
+                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 1, tf_width, neumann=neumann),
                             'Y')
 
-        ur = uf - filter_iteration(uf, static.wet_u, 'xq', 'yh', 2, tf_width)
-        vr = vf - filter_iteration(vf, static.wet_v, 'xh', 'yq', 2, tf_width)
-        vort_xyr = vort_xyf - filter_iteration(vort_xyf, static.wet_c, 'xq', 'yq', 2, tf_width)
+        ur = uf - filter_iteration(uf, static.wet_u, 'xq', 'yh', 2, tf_width, neumann=neumann)
+        vr = vf - filter_iteration(vf, static.wet_v, 'xh', 'yq', 2, tf_width, neumann=neumann)
+        vort_xyr = vort_xyf - filter_iteration(vort_xyf, static.wet_c, 'xq', 'yq', 2, tf_width, neumann=neumann)
 
-        bx_comb = filter_iteration(grid.interp(ur,['X','Y']) * grid.interp(vort_xyr,'X'), static.wet_v, 'xh', 'yq', 2, tf_width) - \
+        bx_comb = filter_iteration(grid.interp(ur,['X','Y']) * grid.interp(vort_xyr,'X'), static.wet_v, 'xh', 'yq', 2, tf_width, neumann=neumann) - \
                 grid.interp(
-                    filter_iteration(ur, static.wet_u, 'xq', 'yh', 2, tf_width),
+                    filter_iteration(ur, static.wet_u, 'xq', 'yh', 2, tf_width, neumann=neumann),
                     ['X','Y']) * \
                 grid.interp(
-                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 2, tf_width),
+                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 2, tf_width, neumann=neumann),
                             'X')
 
-        by_comb = filter_iteration(grid.interp(vr,['X','Y']) * grid.interp(vort_xyr,'Y'), static.wet_u, 'xq', 'yh', 2, tf_width) - \
+        by_comb = filter_iteration(grid.interp(vr,['X','Y']) * grid.interp(vort_xyr,'Y'), static.wet_u, 'xq', 'yh', 2, tf_width, neumann=neumann) - \
                 grid.interp(
-                    filter_iteration(vr, static.wet_v, 'xh', 'yq', 2, tf_width),
+                    filter_iteration(vr, static.wet_v, 'xh', 'yq', 2, tf_width, neumann=neumann),
                     ['X','Y']) * \
                 grid.interp(
-                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 2, tf_width),
+                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 2, tf_width, neumann=neumann),
                             'Y')
 
-        bx = bx_comb - filter_iteration(bx_base, static.wet_v, 'xh', 'yq', 1, tf_width)
-        by = by_comb - filter_iteration(by_base, static.wet_u, 'xq', 'yh', 1, tf_width)
+        bx = bx_comb - filter_iteration(bx_base, static.wet_v, 'xh', 'yq', 1, tf_width, neumann=neumann)
+        by = by_comb - filter_iteration(by_base, static.wet_u, 'xq', 'yh', 1, tf_width, neumann=neumann)
     else:
         bx = 0 * leo_x
         by = 0 * leo_y
@@ -259,7 +262,7 @@ def dyn_model(_u, _v, static, h = None, tf_width=np.sqrt(6), tf_iter=1, filters_
             'dudt_opt': dudt_opt, 'dvdt_opt': dvdt_opt
            }
 
-def dyn_model_SSD(_u, _v, static, h=None, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.sqrt(2), ssm=False, reynolds=False, clip=False, Lat=(35,45), Lon=(5,15), SGS_CAu=None, SGS_CAv=None):
+def dyn_model_SSD(_u, _v, static, h=None, tf_width=np.sqrt(6), tf_iter=1, filters_ratio=np.sqrt(2), ssm=False, reynolds=False, clip=False, Lat=(35,45), Lon=(5,15), SGS_CAu=None, SGS_CAv=None, neumann=False):
     if tf_iter>1:
         print('Not Implemented error in dyn_model')
         print(tf_iter)
@@ -282,8 +285,8 @@ def dyn_model_SSD(_u, _v, static, h=None, tf_width=np.sqrt(6), tf_iter=1, filter
     v = (_v * static.wet_v).fillna(0.).astype('float64')#.chunk({'Time': 50})
 
     # Model in vorticity fluxes
-    uf = filter_iteration(u, static.wet_u, 'xq', 'yh', tf_iter, tf_width)
-    vf = filter_iteration(v, static.wet_v, 'xh', 'yq', tf_iter, tf_width)
+    uf = filter_iteration(u, static.wet_u, 'xq', 'yh', tf_iter, tf_width, neumann=neumann)
+    vf = filter_iteration(v, static.wet_v, 'xh', 'yq', tf_iter, tf_width, neumann=neumann)
 
     sh_xx, sh_xy, shear_mag, vort_xy = compute_velocity_gradients(u, v, static, grid)
     sh_xxf, sh_xyf, shear_magf, vort_xyf = compute_velocity_gradients(uf, vf, static, grid)
@@ -300,28 +303,28 @@ def dyn_model_SSD(_u, _v, static, h=None, tf_width=np.sqrt(6), tf_iter=1, filter
     m_x = smag_xf
     m_y = smag_yf
 
-    leo_x = filter_iteration(grid.interp(u,['X','Y']) * grid.interp(vort_xy,'X'), static.wet_v, 'xh', 'yq', tf_iter, tf_width) - \
+    leo_x = filter_iteration(grid.interp(u,['X','Y']) * grid.interp(vort_xy,'X'), static.wet_v, 'xh', 'yq', tf_iter, tf_width, neumann=neumann) - \
             grid.interp(uf,['X','Y']) * grid.interp(vort_xyf,'X')
     leo_x = leo_x * static.wet_v
     
-    leo_y = filter_iteration(grid.interp(v,['X','Y']) * grid.interp(vort_xy,'Y'), static.wet_u, 'xq','yh', tf_iter, tf_width) - \
+    leo_y = filter_iteration(grid.interp(v,['X','Y']) * grid.interp(vort_xy,'Y'), static.wet_u, 'xq','yh', tf_iter, tf_width, neumann=neumann) - \
             grid.interp(vf,['X','Y']) * grid.interp(vort_xyf,'Y')
     leo_y = leo_y * static.wet_u
 
     if ssm:
-        h_x = filter_iteration(grid.interp(uf,['X','Y']) * grid.interp(vort_xyf,'X'), static.wet_v, 'xh', 'yq', 1, tf_width) - \
+        h_x = filter_iteration(grid.interp(uf,['X','Y']) * grid.interp(vort_xyf,'X'), static.wet_v, 'xh', 'yq', 1, tf_width, neumann=neumann) - \
               grid.interp(
-                  filter_iteration(uf, static.wet_u, 'xq', 'yh', 1, tf_width),
+                  filter_iteration(uf, static.wet_u, 'xq', 'yh', 1, tf_width, neumann=neumann),
                   ['X','Y']) * \
               grid.interp(
-                  filter_iteration(vort_xyf, static.wet_c, 'xq', 'yq', 1, tf_width),
+                  filter_iteration(vort_xyf, static.wet_c, 'xq', 'yq', 1, tf_width, neumann=neumann),
                   'X')
-        h_y = filter_iteration(grid.interp(vf,['X','Y']) * grid.interp(vort_xyf,'Y'), static.wet_u, 'xq', 'yh', 1, tf_width) - \
+        h_y = filter_iteration(grid.interp(vf,['X','Y']) * grid.interp(vort_xyf,'Y'), static.wet_u, 'xq', 'yh', 1, tf_width, neumann=neumann) - \
               grid.interp(
-                  filter_iteration(vf, static.wet_v, 'xh', 'yq', 1, tf_width),
+                  filter_iteration(vf, static.wet_v, 'xh', 'yq', 1, tf_width, neumann=neumann),
                   ['X','Y']) * \
               grid.interp(
-                  filter_iteration(vort_xyf, static.wet_c, 'xq', 'yq', 1, tf_width),
+                  filter_iteration(vort_xyf, static.wet_c, 'xq', 'yq', 1, tf_width, neumann=neumann),
                   'Y')
     else:
         h_x = 0
@@ -332,40 +335,40 @@ def dyn_model_SSD(_u, _v, static, h=None, tf_width=np.sqrt(6), tf_iter=1, filter
         vr = v - vf
         vort_xyr = vort_xy - vort_xyf
         
-        bx_base = filter_iteration(grid.interp(ur,['X','Y']) * grid.interp(vort_xyr,'X'), static.wet_v, 'xh', 'yq', 1, tf_width) - \
+        bx_base = filter_iteration(grid.interp(ur,['X','Y']) * grid.interp(vort_xyr,'X'), static.wet_v, 'xh', 'yq', 1, tf_width, neumann=neumann) - \
                 grid.interp(
-                    filter_iteration(ur, static.wet_u, 'xq', 'yh', 1, tf_width),
+                    filter_iteration(ur, static.wet_u, 'xq', 'yh', 1, tf_width, neumann=neumann),
                     ['X','Y']) * \
                 grid.interp(
-                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 1, tf_width),
+                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 1, tf_width, neumann=neumann),
                             'X')
 
-        by_base = filter_iteration(grid.interp(vr,['X','Y']) * grid.interp(vort_xyr,'Y'), static.wet_u, 'xq', 'yh', 1, tf_width) - \
+        by_base = filter_iteration(grid.interp(vr,['X','Y']) * grid.interp(vort_xyr,'Y'), static.wet_u, 'xq', 'yh', 1, tf_width, neumann=neumann) - \
                 grid.interp(
-                    filter_iteration(vr, static.wet_v, 'xh', 'yq', 1, tf_width),
+                    filter_iteration(vr, static.wet_v, 'xh', 'yq', 1, tf_width, neumann=neumann),
                     ['X','Y']) * \
                 grid.interp(
-                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 1, tf_width),
+                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 1, tf_width, neumann=neumann),
                             'Y')
         
-        ur = uf - filter_iteration(uf, static.wet_u, 'xq', 'yh', 1, tf_width)
-        vr = vf - filter_iteration(vf, static.wet_v, 'xh', 'yq', 1, tf_width)
-        vort_xyr = vort_xyf - filter_iteration(vort_xyf, static.wet_c, 'xq', 'yq', 1, tf_width)
+        ur = uf - filter_iteration(uf, static.wet_u, 'xq', 'yh', 1, tf_width, neumann=neumann)
+        vr = vf - filter_iteration(vf, static.wet_v, 'xh', 'yq', 1, tf_width, neumann=neumann)
+        vort_xyr = vort_xyf - filter_iteration(vort_xyf, static.wet_c, 'xq', 'yq', 1, tf_width, neumann=neumann)
 
-        bx = filter_iteration(grid.interp(ur,['X','Y']) * grid.interp(vort_xyr,'X'), static.wet_v, 'xh', 'yq', 1, tf_width) - \
+        bx = filter_iteration(grid.interp(ur,['X','Y']) * grid.interp(vort_xyr,'X'), static.wet_v, 'xh', 'yq', 1, tf_width, neumann=neumann) - \
                 grid.interp(
-                    filter_iteration(ur, static.wet_u, 'xq', 'yh', 1, tf_width),
+                    filter_iteration(ur, static.wet_u, 'xq', 'yh', 1, tf_width, neumann=neumann),
                     ['X','Y']) * \
                 grid.interp(
-                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 1, tf_width),
+                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 1, tf_width, neumann=neumann),
                             'X')
 
-        by = filter_iteration(grid.interp(vr,['X','Y']) * grid.interp(vort_xyr,'Y'), static.wet_u, 'xq', 'yh', 1, tf_width) - \
+        by = filter_iteration(grid.interp(vr,['X','Y']) * grid.interp(vort_xyr,'Y'), static.wet_u, 'xq', 'yh', 1, tf_width, neumann=neumann) - \
                 grid.interp(
-                    filter_iteration(vr, static.wet_v, 'xh', 'yq', 1, tf_width),
+                    filter_iteration(vr, static.wet_v, 'xh', 'yq', 1, tf_width, neumann=neumann),
                     ['X','Y']) * \
                 grid.interp(
-                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 1, tf_width),
+                    filter_iteration(vort_xyr, static.wet_c, 'xq', 'yq', 1, tf_width, neumann=neumann),
                             'Y')
     else:
         bx = 0 * leo_x

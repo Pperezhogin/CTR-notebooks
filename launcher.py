@@ -92,6 +92,20 @@ def configuration(exp='R4'):
             DT=1080.,
             DT_FORCING=1080.
         )
+    if exp=='R4-FGR-2':
+        return dictionary(
+            NIGLOBAL=72,
+            NJGLOBAL=66,
+            DT=1080.,
+            DT_FORCING=1080.
+        )
+    if exp=='R4-FGR-sqrt12':
+        return dictionary(
+            NIGLOBAL=124,
+            NJGLOBAL=114,
+            DT=1080.,
+            DT_FORCING=1080.
+        )
     if exp=='R5':
         return dictionary(
             NIGLOBAL=110,
@@ -117,6 +131,20 @@ def configuration(exp='R4'):
         return dictionary(
             NIGLOBAL=176,
             NJGLOBAL=160,
+            DT=540.,
+            DT_FORCING=540.
+        )
+    if exp=='R8-FGR-2':
+        return dictionary(
+            NIGLOBAL=144,
+            NJGLOBAL=130,
+            DT=540.,
+            DT_FORCING=540.
+        )
+    if exp=='R8-FGR-sqrt12':
+        return dictionary(
+            NIGLOBAL=248,
+            NJGLOBAL=226,
             DT=540.,
             DT_FORCING=540.
         )
@@ -219,24 +247,48 @@ if __name__ == '__main__':
     #                             PG23_SSM=ssm,
     #                             PG23_REYNOLDS=reynolds,
     #                             PG23_ZELONG_DYNAMIC=zelong,
-    #                             PG23_BOUNDARY_DISCARD=10.
+    #                             PG23_BOUNDARY_DISCARD=10,
     #                             THICKNESSDIFFUSE=True,
-    #                             PG23_THICKNESS_FLUXES_SSM=True
+    #                             PG23_THICKNESS_STREAMFUN_SSM=True
     #                             ).add(**configuration(conf))
     #                         ntasks = dict(R2=4, R3=8, R4=16, R5=16, R6=16, R7=32, R8=32)[conf]
     #                         hpc = HPC.add(ntasks=ntasks, time=24)
-    #                         run_experiment(f'/home/ctrsp-2024/pp2681/experiments/SSM-thickness/zelong-{zelong}-ssm-{ssm}-reynolds-{reynolds}-reduce-{reduce}/{conf}', hpc, parameters)
+    #                         run_experiment(f'/home/ctrsp-2024/pp2681/experiments/SSM-streamfunction/zelong-{zelong}-ssm-{ssm}-reynolds-{reynolds}-reduce-{reduce}/{conf}', hpc, parameters)
 
-    for conf in ['R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8']:
-        for Cs in [0.01, 0.03, 0.06]:
-            parameters = PARAMETERS.add(
-                SMAG_BI_CONST=Cs,
-                THICKNESSDIFFUSE=True,
-                PG23_THICKNESS_STREAMFUN_SSM=True
-                ).add(**configuration(conf))
-            ntasks = dict(R2=4, R3=8, R4=16, R5=16, R6=16, R7=32, R8=32)[conf]
-            hpc = HPC.add(ntasks=ntasks, time=24)
-            run_experiment(f'/home/ctrsp-2024/pp2681/experiments/SSM-streamfunction/bare-{Cs}/{conf}', hpc, parameters)
+    for conf in ['R4','R8']:
+        for reduce in [0,1]:
+            for ssm in ['False', 'True']:
+                for reynolds in ['False', 'True']:
+                    for zelong in ['False', 'True']:
+                        for FGR in ['2', 'sqrt12']:
+                            if FGR == '2':
+                                kw = {'PG23_TEST_WIDTH': 2.}
+                            if FGR == 'sqrt12':
+                                kw = {'PG23_TEST_ITER': 2}
+                            parameters = PARAMETERS.add(
+                                SMAG_BI_CONST=1.0,
+                                USE_PG23='True',
+                                PG23_REDUCE=reduce,
+                                PG23_SSM=ssm,
+                                PG23_REYNOLDS=reynolds,
+                                PG23_ZELONG_DYNAMIC=zelong,
+                                PG23_BOUNDARY_DISCARD=10,
+                                **kw
+                                ).add(**configuration(f'{conf}-FGR-{FGR}'))
+                            ntasks = dict(R4=32,R8=32)[conf]
+                            hpc = HPC.add(ntasks=ntasks, time=24)
+                            run_experiment(f'/home/ctrsp-2024/pp2681/experiments/generalization-boundary10/zelong-{zelong}-ssm-{ssm}-reynolds-{reynolds}-reduce-{reduce}/{conf}-FGR-{FGR}', hpc, parameters)
+
+    # for conf in ['R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8']:
+    #     for Cs in [0.01, 0.03, 0.06]:
+    #         parameters = PARAMETERS.add(
+    #             SMAG_BI_CONST=Cs,
+    #             THICKNESSDIFFUSE=True,
+    #             PG23_THICKNESS_STREAMFUN_SSM=True
+    #             ).add(**configuration(conf))
+    #         ntasks = dict(R2=4, R3=8, R4=16, R5=16, R6=16, R7=32, R8=32)[conf]
+    #         hpc = HPC.add(ntasks=ntasks, time=24)
+    #         run_experiment(f'/home/ctrsp-2024/pp2681/experiments/SSM-streamfunction/bare-{Cs}/{conf}', hpc, parameters)
 
     # for conf in ['R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8']:
     #     for reduce in [0,1]:
