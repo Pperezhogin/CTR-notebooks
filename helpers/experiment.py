@@ -318,6 +318,10 @@ class Experiment:
     @netcdf_property
     def SSM_transfer(self):
         return self.transfer(self.pg23.leo_y, -self.pg23.leo_x)
+
+    @netcdf_property
+    def Rey_transfer(self):
+        return self.transfer(self.pg23.by_base, -self.pg23.bx_base)
     
     @netcdf_property
     def ZB_transfer(self):

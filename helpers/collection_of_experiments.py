@@ -101,7 +101,7 @@ class CollectionOfExperiments:
 
         return cls(exps, experiments_dict, names_dict)
     
-    def plot_KE_spectrum(self, exps, labels=None, key='EKE_spectrum'):
+    def plot_KE_spectrum(self, exps, labels=None, key='EKE_spectrum', color=None, ls=None):
         if labels is None:
             labels=exps
         fig, ax = plt.subplots(1,2,figsize=(15,6))
@@ -113,16 +113,20 @@ class CollectionOfExperiments:
             KE_upper = KE.isel(zl=0)
             KE_lower = KE.isel(zl=1)
 
-            color = {exps[0]: 'gray', exps[-1]: 'k'}
-            lw = {exps[-1]: 1}
-            p.extend(ax[0].loglog(k, KE_upper, lw=lw.get(exp,2), label=labels[j], color=color.get(exp,None)))
+            if color is None:
+                color = {exps[0]: 'gray', exps[-1]: 'k'}
+            if ls is None:
+                ls = {}
+            
+            lw = {exps[-1]: 2}
+            p.extend(ax[0].loglog(k, KE_upper, lw=lw.get(exp,3), label=labels[j], color=color.get(exp,None), ls=ls.get(exp,None)))
             ax[0].set_xlabel(r'wavenumber, $k [m^{-1}]$')
             ax[0].set_ylabel(r'Energy spectrum, $E(k) [m^3/s^2]$')
             ax[0].set_title('Upper layer')
             #ax[0].legend(prop={'size': 14})
             #ax[0].grid(which='both',linestyle=':')
 
-            p.extend(ax[1].loglog(k, KE_lower, lw=lw.get(exp,2), label=labels[j], color=color.get(exp,None)))
+            p.extend(ax[1].loglog(k, KE_lower, lw=lw.get(exp,3), label=labels[j], color=color.get(exp,None), ls=ls.get(exp,None)))
             ax[1].set_xlabel(r'wavenumber, $k [m^{-1}]$')
             ax[1].set_ylabel(r'Energy spectrum, $E(k) [m^3/s^2]$')
             ax[1].set_title('Lower layer')
@@ -135,10 +139,10 @@ class CollectionOfExperiments:
         ax[0].loglog(k,E,'--k')
         ax[0].text(8e-5,5e+1,'$k^{-3}$')
         ax[0].set_xlim([None,1e-3])
-        ax[0].set_ylim([1e-3,1e+3])
+        ax[0].set_ylim([1e-4,1e+3])
         
         ax[1].set_xlim([None,1e-3])
-        ax[1].set_ylim([1e-3,1e+3])
+        ax[1].set_ylim([1e-4,1e+3])
         k = [5e-5, 1e-4]
         E = [3e+1, 0]
         E[1] = E[0] * (k[1]/k[0])**(-3)
@@ -147,9 +151,74 @@ class CollectionOfExperiments:
 
         return p
     
+    def plot_KE_PE_spectrum(self, exps, labels=None, key='EKE_spectrum', color=None, ls=None):
+        if labels is None:
+            labels=exps
+        fig, ax = plt.subplots(1,3,figsize=(20,6))
+        p = []
+        for j,exp in enumerate(exps):
+            KE = self[exp].__getattribute__(key)
+            PE = self[exp].PE_spectrum
+            k = KE.freq_r
+
+            KE_upper = KE.isel(zl=0)
+            KE_lower = KE.isel(zl=1)
+
+            if color is None:
+                color = {exps[0]: 'gray', exps[-1]: 'k'}
+            if ls is None:
+                ls = {}
+            
+            lw = {exps[-1]: 2}
+            p.extend(ax[0].loglog(k, KE_upper, lw=lw.get(exp,3), label=labels[j], color=color.get(exp,None), ls=ls.get(exp,None)))
+            ax[0].set_xlabel(r'wavenumber, $k [m^{-1}]$')
+            ax[0].set_ylabel(r'KE spectrum, $E(k) [m^3/s^2]$')
+            ax[0].set_title('Upper layer')
+            #ax[0].legend(prop={'size': 14})
+            #ax[0].grid(which='both',linestyle=':')
+
+            p.extend(ax[1].loglog(k, KE_lower, lw=lw.get(exp,3), label=labels[j], color=color.get(exp,None), ls=ls.get(exp,None)))
+            ax[1].set_xlabel(r'wavenumber, $k [m^{-1}]$')
+            ax[1].set_ylabel(r'KE spectrum, $E(k) [m^3/s^2]$')
+            ax[1].set_title('Lower layer')
+            #ax[1].grid(which='both',linestyle=':')
+
+            p.extend(ax[2].loglog(k, PE, lw=lw.get(exp,3), label=labels[j], color=color.get(exp,None), ls=ls.get(exp,None)))
+            ax[2].set_xlabel(r'wavenumber, $k [m^{-1}]$')
+            ax[2].set_ylabel(r'PE spectrum, $P(k)$')
+            ax[2].set_title('Interface')
+            ax[2].legend(prop={'size': 14}, bbox_to_anchor=(1,1))
+
+        k = [5e-5, 1e-4]
+        E = [1.5e+2, 0]
+        E[1] = E[0] * (k[1]/k[0])**(-3)
+        ax[0].loglog(k,E,'--k')
+        ax[0].text(8e-5,5e+1,'$k^{-3}$')
+        ax[0].set_xlim([None,1e-3])
+        ax[0].set_ylim([1e-4,1e+3])
+        
+        ax[1].set_xlim([None,1e-3])
+        ax[1].set_ylim([1e-4,1e+3])
+        k = [5e-5, 1e-4]
+        E = [3e+1, 0]
+        E[1] = E[0] * (k[1]/k[0])**(-3)
+        ax[1].loglog(k,E,'--k')
+        ax[1].text(8e-5,1e+1,'$k^{-3}$')
+
+        ax[2].set_xlim([None,1e-3])
+        ax[2].set_ylim([1,None])
+        k = [5e-5, 1e-4]
+        #E = [3e+1, 0]
+        #E[1] = E[0] * (k[1]/k[0])**(-3)
+        #ax[1].loglog(k,E,'--k')
+        #ax[1].text(8e-5,1e+1,'$k^{-3}$')
+
+        return p
+
     def plot_transfer(self, exp, target='R64_R4', callback=True):
         full = self[exp].Smagorinsky_transfer
         SSM = self[exp].SSM_transfer
+        Rey = self[exp].Rey_transfer
         kmax = self[exp].kmax
         if target is not None:
             SGS = self[target].SGS_transfer
@@ -163,7 +232,8 @@ class CollectionOfExperiments:
             if target is not None:
                 SGS.isel(zl=zl).plot(label='SGS', color='k', ls='-')
             SSM.isel(zl=zl).plot(label='SSM', color='tab:orange', ls='--')
-            (full-SSM).isel(zl=zl).plot(label='Smag', color='tab:green', ls='-.')
+            Rey.isel(zl=zl).plot(label='Reynolds', color='tab:red', ls=':')
+            (full-SSM-Rey).isel(zl=zl).plot(label='Smag', color='tab:green', ls='-.')
             (full).isel(zl=zl).plot(label='Full', color='tab:blue')
             plt.legend()
             plt.axhline(y=0,ls='-',color='gray',alpha=0.5)
