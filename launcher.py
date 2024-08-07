@@ -272,34 +272,48 @@ if __name__ == '__main__':
     for conf in ['R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8']:
         ntasks = dict(R2=4, R3=8, R4=16, R5=16, R6=16, R7=32, R8=32)[conf]
         hpc = HPC.add(ntasks=ntasks, time=24)
-        parameters = PARAMETERS.add(
-                                    SMAG_BI_CONST=1.0,
-                                    USE_PG23='True',
-                                    PG23_REDUCE=0,
-                                    PG23_SSM='True',
-                                    PG23_REYNOLDS='False',
-                                    PG23_ZELONG_DYNAMIC='True',
-                                    PG23_BOUNDARY_DISCARD=10,
-                                    PG23_BI_CONST_MIN=0.01,
-                                    PG23_TEST_ITER=2
-                                    ).add(**configuration(conf))
-        run_experiment(f'/home/ctrsp-2024/pp2681/experiments/generalization-FGR-sqrt12/DbMM/{conf}', hpc, parameters)
+        # parameters = PARAMETERS.add(
+        #                             SMAG_BI_CONST=1.0,
+        #                             USE_PG23='True',
+        #                             PG23_REDUCE=0,
+        #                             PG23_SSM='True',
+        #                             PG23_REYNOLDS='False',
+        #                             PG23_ZELONG_DYNAMIC='True',
+        #                             PG23_BOUNDARY_DISCARD=10,
+        #                             PG23_BI_CONST_MIN=0.01,
+        #                             PG23_TEST_ITER=2
+        #                             ).add(**configuration(conf))
+        # run_experiment(f'/home/ctrsp-2024/pp2681/experiments/generalization-FGR-sqrt12/DbMM/{conf}', hpc, parameters)
 
-        parameters = PARAMETERS.add(
-                                    SMAG_BI_CONST=1.0,
-                                    USE_PG23='True',
-                                    PG23_REDUCE=0,
-                                    PG23_SSM='True',
-                                    PG23_REYNOLDS='False',
-                                    PG23_ZELONG_DYNAMIC='True',
-                                    PG23_BOUNDARY_DISCARD=10,
-                                    PG23_BI_CONST_MIN=0.01,
-                                    PG23_TEST_ITER=2,
-                                    THICKNESSDIFFUSE=True,
-                                    PG23_THICKNESS_STREAMFUN_SSM=True
-                                    ).add(**configuration(conf))
-        run_experiment(f'/home/ctrsp-2024/pp2681/experiments/generalization-FGR-sqrt12/DbMMh/{conf}', hpc, parameters)
+        # parameters = PARAMETERS.add(
+        #                             SMAG_BI_CONST=1.0,
+        #                             USE_PG23='True',
+        #                             PG23_REDUCE=0,
+        #                             PG23_SSM='True',
+        #                             PG23_REYNOLDS='False',
+        #                             PG23_ZELONG_DYNAMIC='True',
+        #                             PG23_BOUNDARY_DISCARD=10,
+        #                             PG23_BI_CONST_MIN=0.01,
+        #                             PG23_TEST_ITER=2,
+        #                             THICKNESSDIFFUSE=True,
+        #                             PG23_THICKNESS_STREAMFUN_SSM=True
+        #                             ).add(**configuration(conf))
+        # run_experiment(f'/home/ctrsp-2024/pp2681/experiments/generalization-FGR-sqrt12/DbMMh/{conf}', hpc, parameters)
 
+        # parameters = PARAMETERS.add(
+        #                             SMAG_BI_CONST=1.0,
+        #                             USE_PG23='True',
+        #                             PG23_REDUCE=0,
+        #                             PG23_SSM='True',
+        #                             PG23_REYNOLDS='True',
+        #                             PG23_ZELONG_DYNAMIC='True',
+        #                             PG23_BOUNDARY_DISCARD=10,
+        #                             PG23_BI_CONST_MIN=0.01,
+        #                             PG23_TEST_ITER=2,
+        #                             THICKNESSDIFFUSE=True,
+        #                             PG23_THICKNESS_STREAMFUN_SSM=True
+        #                             ).add(**configuration(conf))
+        # run_experiment(f'/home/ctrsp-2024/pp2681/experiments/generalization-FGR-sqrt12/DbMMh-R/{conf}', hpc, parameters)
         parameters = PARAMETERS.add(
                                     SMAG_BI_CONST=1.0,
                                     USE_PG23='True',
@@ -309,11 +323,9 @@ if __name__ == '__main__':
                                     PG23_ZELONG_DYNAMIC='True',
                                     PG23_BOUNDARY_DISCARD=10,
                                     PG23_BI_CONST_MIN=0.01,
-                                    PG23_TEST_ITER=2,
-                                    THICKNESSDIFFUSE=True,
-                                    PG23_THICKNESS_STREAMFUN_SSM=True
+                                    PG23_TEST_ITER=2
                                     ).add(**configuration(conf))
-        run_experiment(f'/home/ctrsp-2024/pp2681/experiments/generalization-FGR-sqrt12/DbMMh-R/{conf}', hpc, parameters)
+        run_experiment(f'/home/ctrsp-2024/pp2681/experiments/generalization-FGR-sqrt12/DbMM-R/{conf}', hpc, parameters)
 
     #for conf in ['R4','R8']:
     # for conf in ['R2']:

@@ -118,36 +118,39 @@ class CollectionOfExperiments:
             if ls is None:
                 ls = {}
             
-            lw = {exps[-1]: 2}
-            p.extend(ax[0].loglog(k, KE_upper, lw=lw.get(exp,3), label=labels[j], color=color.get(exp,None), ls=ls.get(exp,None)))
-            ax[0].set_xlabel(r'wavenumber, $k [m^{-1}]$')
-            ax[0].set_ylabel(r'Energy spectrum, $E(k) [m^3/s^2]$')
-            ax[0].set_title('Upper layer')
+            lw = {exps[-1]: 3}
+            p.extend(ax[0].loglog(k, KE_upper, lw=lw.get(exp,4), label=labels[j], color=color.get(exp,None), ls=ls.get(exp,None)))
+            ax[0].set_xlabel(r'wavenumber, $k ~[\mathrm{km}^{-1}]$')
+            ax[0].set_ylabel(r'Energy spectrum, $E(k)~ [\mathrm{m}^3/\mathrm{s}^2]$')
+            ax[0].set_title('Upper fluid layer')
             #ax[0].legend(prop={'size': 14})
             #ax[0].grid(which='both',linestyle=':')
 
-            p.extend(ax[1].loglog(k, KE_lower, lw=lw.get(exp,3), label=labels[j], color=color.get(exp,None), ls=ls.get(exp,None)))
-            ax[1].set_xlabel(r'wavenumber, $k [m^{-1}]$')
-            ax[1].set_ylabel(r'Energy spectrum, $E(k) [m^3/s^2]$')
-            ax[1].set_title('Lower layer')
+            p.extend(ax[1].loglog(k, KE_lower, lw=lw.get(exp,4), label=labels[j], color=color.get(exp,None), ls=ls.get(exp,None)))
+            ax[1].set_xlabel(r'wavenumber, $k ~[\mathrm{km}^{-1}]$')
+            ax[1].set_ylabel(r'Energy spectrum, $E(k)~ [\mathrm{m}^3/\mathrm{s}^2]$')
+            ax[1].set_title('Lower fluid layer')
             ax[1].legend(prop={'size': 14}, bbox_to_anchor=(1,1))
             #ax[1].grid(which='both',linestyle=':')
 
-        k = [5e-5, 1e-4]
+        k = [5e-5, 3e-4]
         E = [1.5e+2, 0]
         E[1] = E[0] * (k[1]/k[0])**(-3)
         ax[0].loglog(k,E,'--k')
         ax[0].text(8e-5,5e+1,'$k^{-3}$')
-        ax[0].set_xlim([None,1e-3])
-        ax[0].set_ylim([1e-4,1e+3])
+        ax[0].set_xlim([None,5e-4])
+        ax[0].set_ylim([1e-3,1e+3])
+        ax[0].set_xticks([1e-5, 1e-4], ['10$^{-2}$', '10$^{-1}$'])
+        ax[0].axvline(x=0.05283767753228272*1e-3, color='gray', alpha=0.5, lw=3, ymin=0.1)
         
-        ax[1].set_xlim([None,1e-3])
-        ax[1].set_ylim([1e-4,1e+3])
-        k = [5e-5, 1e-4]
+        ax[1].set_xlim([None,5e-4])
+        ax[1].set_ylim([1e-3,1e+3])
+        k = [5e-5, 3e-4]
         E = [3e+1, 0]
         E[1] = E[0] * (k[1]/k[0])**(-3)
         ax[1].loglog(k,E,'--k')
         ax[1].text(8e-5,1e+1,'$k^{-3}$')
+        ax[1].set_xticks([1e-5, 1e-4], ['10$^{-2}$', '10$^{-1}$'])
 
         return p
     
@@ -173,14 +176,14 @@ class CollectionOfExperiments:
             p.extend(ax[0].loglog(k, KE_upper, lw=lw.get(exp,3), label=labels[j], color=color.get(exp,None), ls=ls.get(exp,None)))
             ax[0].set_xlabel(r'wavenumber, $k [m^{-1}]$')
             ax[0].set_ylabel(r'KE spectrum, $E(k) [m^3/s^2]$')
-            ax[0].set_title('Upper layer')
+            ax[0].set_title('Upper fluid layer')
             #ax[0].legend(prop={'size': 14})
             #ax[0].grid(which='both',linestyle=':')
 
             p.extend(ax[1].loglog(k, KE_lower, lw=lw.get(exp,3), label=labels[j], color=color.get(exp,None), ls=ls.get(exp,None)))
             ax[1].set_xlabel(r'wavenumber, $k [m^{-1}]$')
             ax[1].set_ylabel(r'KE spectrum, $E(k) [m^3/s^2]$')
-            ax[1].set_title('Lower layer')
+            ax[1].set_title('Lower fluid layer')
             #ax[1].grid(which='both',linestyle=':')
 
             p.extend(ax[2].loglog(k, PE, lw=lw.get(exp,3), label=labels[j], color=color.get(exp,None), ls=ls.get(exp,None)))
