@@ -101,7 +101,7 @@ class CollectionOfExperiments:
 
         return cls(exps, experiments_dict, names_dict)
     
-    def plot_KE_spectrum(self, exps, labels=None, key='EKE_spectrum', color=None, ls=None):
+    def plot_KE_spectrum(self, exps, labels=None, key='EKE_spectrum', color=None, ls=None, filter_scale=-1):
         if labels is None:
             labels=exps
         fig, ax = plt.subplots(1,2,figsize=(15,6))
@@ -141,7 +141,7 @@ class CollectionOfExperiments:
         ax[0].set_xlim([None,5e-4])
         ax[0].set_ylim([1e-3,1e+3])
         ax[0].set_xticks([1e-5, 1e-4], ['10$^{-2}$', '10$^{-1}$'])
-        ax[0].axvline(x=0.05283767753228272*1e-3, color='gray', alpha=0.5, lw=3, ymin=0.1)
+        ax[0].axvline(x=filter_scale, color='gray', alpha=0.5, lw=3, ymin=0.1)
         
         ax[1].set_xlim([None,5e-4])
         ax[1].set_ylim([1e-3,1e+3])
@@ -151,6 +151,7 @@ class CollectionOfExperiments:
         ax[1].loglog(k,E,'--k')
         ax[1].text(8e-5,1e+1,'$k^{-3}$')
         ax[1].set_xticks([1e-5, 1e-4], ['10$^{-2}$', '10$^{-1}$'])
+        ax[1].axvline(x=filter_scale, color='gray', alpha=0.5, lw=3, ymin=0.1)
 
         return p
     
