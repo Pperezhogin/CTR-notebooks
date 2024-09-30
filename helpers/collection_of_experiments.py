@@ -606,10 +606,13 @@ class CollectionOfExperiments:
             # Manually set zorder to avoid bug in matplotlib
             # https://stackoverflow.com/questions/37611023/3d-parametric-curve-in-matplotlib-does-not-respect-zorder-workaround
             axes.computed_zorder = False
+            axes.plot(np.nan,np.nan,'->',color='k',label='Wind stress')
 
             [X,Y] = np.meshgrid(topography.xh, topography.yh)
-            p1 = axes.plot_surface(X,Y,topography, label='Topography', edgecolor='none', zorder=-2, color=[0.8, 0.8, 0.8], alpha=1.0)
-            p2 = axes.plot_surface(X,Y,interface, label='Interface', edgecolor='none', color='tab:orange', zorder=-2, alpha=0.5)
+            p3 = axes.plot_surface(X,Y,free_surface, label='Free surface', edgecolor='none', color='b', zorder=-1, alpha=0.3)
+            p2 = axes.plot_surface(X,Y,interface, label='Interface', edgecolor='none', color='tab:blue', zorder=-2, alpha=0.5)
+            p1 = axes.plot_surface(X,Y,topography, label='Ocean floor', edgecolor='none', zorder=-3, color=[0.9, 0.9, 0.9], alpha=1.0)
+            print(X.shape, free_surface.shape) 
             # #p3 = axes.plot_surface(X,Y,topography*0-0.3, edgecolor='none', alpha=0.3)
 
             yy = taux.yh
@@ -620,7 +623,7 @@ class CollectionOfExperiments:
             #axes.quiver(xx, yy, zz, vector, vector*0, vector*0, length = 100, alpha=1.0, linewidth=1, label='Wind stress', head_length=30)
             from mpl_toolkits.mplot3d.art3d import Line3D, Poly3DCollection
             for x, y, z, v in zip(xx, yy, zz, vector):
-                axes.add_artist(Line3D([x, x+v*100], [y, y], [z, z], color='tab:blue', linewidth=1.5, zorder=10))
+                axes.add_artist(Line3D([x, x+v*100], [y, y], [z, z], color='k', linewidth=1.5, zorder=10, alpha=0.5))
                 x = x+v*100 # arrow end
                 arrow_size = 1
                 arrow = [[
@@ -628,15 +631,14 @@ class CollectionOfExperiments:
                     [x - arrow_size*0.5, y+arrow_size*0.3, z],
                     [x - arrow_size*0.5, y-arrow_size*0.3, z]
                 ]]
-                axes.add_collection3d(Poly3DCollection(arrow, color='tab:blue', zorder=10))
+                axes.add_collection3d(Poly3DCollection(arrow, color='k', zorder=10, alpha=0.5))
 
-            [X,Y] = np.meshgrid(free_surface.xh, free_surface.yh)
-            levels = 0.01*np.arange(-4,4.5,0.5)
-            axes.contourf(X, Y, free_surface, levels=levels, cmap='bwr', zorder=-1, vmin=-0.04, vmax=0.04)
-            axes.contour(X, Y, free_surface, levels=levels, colors='k', linewidths=1.5)
+            #[X,Y] = np.meshgrid(free_surface.xh, free_surface.yh)
+            #levels = 0.01*np.arange(-4,4.5,0.5)
+            #axes.contourf(X, Y, free_surface, levels=levels, cmap='bwr', zorder=-1, vmin=-0.04, vmax=0.04)
+            #axes.contour(X, Y, free_surface, levels=levels, colors='k', linewidths=1.5)
             
-            axes.plot(np.nan,np.nan,'-',color='k',label='SSH contour')
-            axes.plot(np.nan,np.nan,'->',color='tab:blue',label='Wind stress')
+            #axes.plot(np.nan,np.nan,'-',color='k',label='SSH contour')
 
             axes.view_init(xangle, yangle)
 
@@ -651,14 +653,15 @@ class CollectionOfExperiments:
             #p1.set_rasterized(True)
             #p2.set_rasterized(True)
 
-            # p3._facecolors2d = p3._facecolor3d
-            # p3._edgecolors2d = p3._facecolor3d
+            p3._facecolors2d = p3._facecolor3d
+            p3._edgecolors2d = p3._facecolor3d
              
             axes.set_xlabel('Longitude', labelpad=5)
             axes.set_ylabel('Latitude', labelpad=5)
             axes.zaxis.set_rotate_label(False)
-            axes.set_zlabel('Depth, $km$', labelpad=5, rotation=90)
+            axes.set_zlabel('Depth, $\mathrm{km}$', labelpad=5, rotation=90)
             axes.set_yticks([30,35,40,45,50])
+            axes.set_xticks([0,5,10,15,20])
             axes.set_ylim([30,50])
             axes.set_xlim([0,22])
             axes.set_zticks([0, -5, -10, -15, -20],['$0.0$', '$0.5$', '$1.0$', '$1.5$', '$2.0$'], rotation=45)
@@ -670,10 +673,10 @@ class CollectionOfExperiments:
         
         topography = self['R2'].e.isel(zi=2, Time=-1).coarsen(xh=2, yh=2, boundary='trim').mean()
         interface = xr.where(topography > -1000, np.nan, -1000)
-        free_surface = self['R64_R4'].ssh_mean
+        free_surface = self['R2'].ssh_mean.coarsen(xh=2, yh=2, boundary='trim').mean()
         taux = self['R2'].forcing.taux.isel(Time=-1).coarsen(yh=2, boundary='trim').mean()
 
         if axes is None:
             axes = plt.gca(projection='3d')
-        plot(axes, 30, 200, topography, interface, free_surface, taux)
+        plot(axes, 30, 230, topography, interface, free_surface, taux)
         #plot(axes, 30, 230, topography, interface, free_surface, taux)
