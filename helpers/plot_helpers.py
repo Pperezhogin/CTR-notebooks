@@ -257,7 +257,7 @@ def imshow(_q, cbar=True, location='right', cbar_label=None, ax=None, cmap=None,
     plt.sca(ax)
     return im
 
-def set_letters(x=-0.2, y=1.05, fontsize=11, letters=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'], color='k'):
+def set_letters(x=-0.2, y=1.05, fontsize=11, letters=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'], color='k', fontweight='bold'):
     fig = plt.gcf()
     axes = fig.axes
     j = 0
@@ -271,7 +271,7 @@ def set_letters(x=-0.2, y=1.05, fontsize=11, letters=['a', 'b', 'c', 'd', 'e', '
                 print('Colorbar-like object skipped')
             else:
                 try:
-                    ax.text(x,y,f'({letters[j]})', transform = ax.transAxes, fontweight='bold', fontsize=fontsize, color=color)
+                    ax.text(x,y,f'({letters[j]})', transform = ax.transAxes, fontweight=fontweight, fontsize=fontsize, color=color, zorder=100)
                 except:
                     print('Cannot set letter', letters[j])
                 j += 1
